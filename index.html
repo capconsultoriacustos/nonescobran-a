@@ -740,10 +740,19 @@ function salvarConfig(){
 async function sbReq(table,method,body,query){
   const url=SB_URL+'/rest/v1/'+table+(query||'');
   const prefer= method==='POST'?'resolution=merge-duplicates,return=representation': (method==='PATCH'||method==='DELETE'?'return=representation':'');
-  const res=await fetch(url,{method,headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':prefer},body:body?JSON.stringify(body):null});
-  if(!res.ok){const t=await res.text();throw new Error(method+' '+table+': '+res.status+' — '+t);}
-  if(res.status===204)return[];
-  return res.json();
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),10000);
+  try{
+    const res=await fetch(url,{method,signal:controller.signal,headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':prefer},body:body?JSON.stringify(body):null});
+    clearTimeout(timer);
+    if(!res.ok){const t=await res.text();throw new Error(method+' '+table+': '+res.status+' — '+t);}
+    if(res.status===204)return[];
+    return res.json();
+  }catch(e){
+    clearTimeout(timer);
+    if(e.name==='AbortError')throw new Error('Timeout ao conectar ao Supabase. Verifique sua internet.');
+    throw e;
+  }
 }
 const sb={
   getAll:(t,q)=>sbReq(t,'GET',null,q||'?order=criado_em.asc'),
@@ -785,24 +794,29 @@ async function inicializar(){
   try{
     await carregarTudo();
     hideLoading();
-    if(currentUser)renderAll();
+    document.getElementById('loginScreen').style.display='flex';
   }catch(e){
     hideLoading();
-    console.error(e);
-    if(e.message.includes('401')||e.message.includes('Failed')){openModal('modalConfig');}
-    else{alert('Erro ao conectar: '+e.message);openModal('modalConfig');}
+    console.error('Erro Supabase:',e);
+    const msg=e.message||'';
+    if(msg.includes('401')||msg.includes('403')||msg.includes('Invalid')){
+      alert('Credenciais inválidas. Verifique a configuração.');
+      openModal('modalConfig');
+    }else{
+      document.getElementById('loginScreen').style.display='flex';
+      setSyncStatus('err');
+    }
   }
 }
 
 async function carregarTudo(){
   setSyncStatus('syncing');
-  const[rc,rl,rcob,ra]=await Promise.all([
-    sb.getAll('clientes','?order=nome.asc'),
-    sb.getAll('lancamentos','?order=venc.asc'),
-    sb.getAll('cobradores','?order=nome.asc'),
-    sb.getAll('atualizacoes','?order=criado_em.desc'),
-  ]);
-  clientes=rc.map(fromCli);lancamentos=rl.map(fromLanc);cobradores=rcob.map(fromCob);atualizacoes=ra.map(fromAtualiz);
+  clientes    = (await sb.getAll('clientes',   '?order=nome.asc')).map(fromCli);
+  showLoading('Carregando lançamentos...');
+  lancamentos = (await sb.getAll('lancamentos','?order=venc.asc')).map(fromLanc);
+  showLoading('Carregando cobradores...');
+  cobradores  = (await sb.getAll('cobradores', '?order=nome.asc')).map(fromCob);
+  atualizacoes= (await sb.getAll('atualizacoes','?order=criado_em.desc')).map(fromAtualiz);
   setSyncStatus('ok');
 }
 
