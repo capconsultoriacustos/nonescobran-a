@@ -5,7 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CAP Consultoria — Contas a Receber</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// Carrega SDK Supabase com fallback
+(function(){
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+  s.onerror=function(){
+    var s2=document.createElement('script');
+    s2.src='https://unpkg.com/@supabase/supabase-js@2';
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s);
+})();
+</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
@@ -814,25 +826,29 @@ function hideLoading(){document.getElementById('loadingOverlay').classList.add('
 async function inicializar(){
   if(!SB_URL||!SB_KEY){hideLoading();openModal('modalConfig');return;}
   showLoading('Conectando ao Supabase...');
+
+  // Timeout de segurança: após 8s mostra login de qualquer jeito
+  const fallback = setTimeout(()=>{
+    hideLoading();
+    document.getElementById('loginScreen').style.display='flex';
+    setSyncStatus('err');
+    console.warn('Timeout na conexão — mostrando login offline');
+  }, 8000);
+
   try{
     await carregarTudo();
+    clearTimeout(fallback);
     hideLoading();
     document.getElementById('loginScreen').style.display='flex';
   }catch(e){
+    clearTimeout(fallback);
     hideLoading();
     console.error('Erro Supabase:',e);
+    document.getElementById('loginScreen').style.display='flex';
+    setSyncStatus('err');
     const msg=e.message||'';
-    if(msg.includes('allowlist')||msg.includes('CORS')){
-      hideLoading();
-      document.getElementById('loginScreen').style.display='flex';
-      setSyncStatus('err');
-      alert('⚠️ Domínio não autorizado no Supabase.\n\nVá em: Supabase → Project Settings → API → Allowed Origins\nAdicione: ' + window.location.origin + '\n\nOu adicione * para liberar tudo.');
-    }else if(msg.includes('401')||msg.includes('403')||msg.includes('Invalid')){
-      alert('Credenciais inválidas. Verifique a configuração.');
-      openModal('modalConfig');
-    }else{
-      document.getElementById('loginScreen').style.display='flex';
-      setSyncStatus('err');
+    if(msg.includes('SDK')){
+      alert('⚠️ Biblioteca Supabase não carregou.\nVerifique sua conexão com a internet e recarregue a página.');
     }
   }
 }
@@ -868,8 +884,20 @@ async function doLogin(){
     document.getElementById('loginScreen').style.display='none';
     document.getElementById('app').style.display='block';
     showLoading('Carregando dados...');
-    try{await seedSeNecessario();await carregarTudo();hideLoading();renderAll();}
-    catch(e){hideLoading();alert('Erro: '+e.message);}
+    try{
+      showLoading('Carregando dados...');
+      await seedSeNecessario();
+      await carregarTudo();
+      hideLoading();
+      renderAll();
+    }catch(e){
+      hideLoading();
+      setSyncStatus('err');
+      console.error(e);
+      // Mostra o app mesmo com erro — dados virão vazios
+      renderAll();
+      alert('Aviso: erro ao carregar dados do servidor.\n'+e.message);
+    }
     err.textContent='';
   }else{err.textContent='Usuário ou senha inválidos.';}
 }
@@ -957,7 +985,20 @@ function statusBadge(s){const m={'Enviado ao Cliente':'badge-blue','Sem Resposta
 document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('lStatus')?.addEventListener('change',function(){document.getElementById('painelPago').style.display=this.value==='Pago'?'block':'none';if(this.value==='Pago')document.getElementById('lDataPago').value=today();});
   document.getElementById('novoStatus')?.addEventListener('change',function(){document.getElementById('painelStatusPago').style.display=this.value==='Pago'?'block':'none';if(this.value==='Pago')document.getElementById('sDataPago').value=today();});
-  inicializar();
+  // Aguarda SDK carregar antes de inicializar
+  function aguardarSDK(tentativas){
+    if(typeof supabase !== 'undefined'){
+      inicializar();
+    } else if(tentativas > 0){
+      setTimeout(()=>aguardarSDK(tentativas-1), 300);
+    } else {
+      hideLoading();
+      document.getElementById('loginScreen').style.display='flex';
+      setSyncStatus('err');
+      alert('Não foi possível carregar a biblioteca Supabase. Verifique sua internet e recarregue.');
+    }
+  }
+  aguardarSDK(20);
 });
 
 function openModalLanc(id=null){
