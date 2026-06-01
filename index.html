@@ -1144,17 +1144,18 @@ function renderLogins(){
   loadLogins();
   document.getElementById('countLogins').textContent=logins.length+' login(s) cadastrado(s)';
   const tb=document.getElementById('tblLogins');
-  tb.innerHTML=logins.map(l=>`
-    <tr>
-      <td><strong>${l.usuario}</strong></td>
-      <td>${l.nome}</td>
-      <td><span class="badge ${l.perfil==='admin'?'badge-red':'badge-blue'}">${l.perfil}</span></td>
-      <td><span class="badge ${l.status==='Ativo'?'badge-green':'badge-gray'}">${l.status}</span></td>
-      <td style="white-space:nowrap;">
-        <button class="action-btn" onclick="openModalLogin('${l.id}')">✏️</button>
-        ${l.id!=='admin'&&l.id!=='financeiro'?'<button class="action-btn" onclick="excluirLogin(''+l.id+'')">🗑️</button>':''}
-      </td>
-    </tr>`).join('');
+  tb.innerHTML=logins.map(function(l){
+    return '<tr>'
+      +'<td><strong>'+l.usuario+'</strong></td>'
+      +'<td>'+l.nome+'</td>'
+      +'<td><span class="badge '+(l.perfil==='admin'?'badge-red':'badge-blue')+'">'+l.perfil+'</span></td>'
+      +'<td><span class="badge '+(l.status==='Ativo'?'badge-green':'badge-gray')+'">'+l.status+'</span></td>'
+      +'<td style="white-space:nowrap;">'
+        +'<button class="action-btn" onclick="openModalLogin(''+l.id+'')">✏️</button>'
+        +(l.id!=='admin'&&l.id!=='financeiro'?'<button class="action-btn" onclick="excluirLogin(''+l.id+'')">🗑️</button>':'')
+      +'</td>'
+      +'</tr>';
+  }).join('');
 }
 
 function excluirLogin(id){
@@ -1208,17 +1209,23 @@ function renderRankings(list){
   if(!rankVal.length){ divVal.innerHTML='<div style="color:#bbb;text-align:center;padding:16px;font-size:13px;">Nenhum débito em aberto.</div>'; }
   else {
     const max = rankVal[0][1];
-    divVal.innerHTML = rankVal.map(([nome,val],i)=>`
-      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5;">
-        <div style="width:22px;height:22px;border-radius:50%;background:${i===0?'#e74c3c':i===1?'#f39c12':i===2?'#f47b20':'#e0e0e0'};color:${i<3?'#fff':'#666'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${i+1}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nome}</div>
-          <div style="background:#f0f0f0;border-radius:4px;height:4px;margin-top:4px;">
-            <div style="background:${i===0?'#e74c3c':'#F47B20'};height:4px;border-radius:4px;width:${Math.round(val/max*100)}%;"></div>
-          </div>
-        </div>
-        <div style="font-weight:700;font-size:13px;color:#e74c3c;flex-shrink:0;">${fmt(val)}</div>
-      </div>`).join('');
+    divVal.innerHTML = rankVal.map(function(entry,i){
+      var nome=entry[0], val=entry[1];
+      var bg=i===0?'#e74c3c':i===1?'#f39c12':i===2?'#f47b20':'#e0e0e0';
+      var fg=i<3?'#fff':'#666';
+      var barBg=i===0?'#e74c3c':'#F47B20';
+      var pct=Math.round(val/max*100);
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5;">'
+        +'<div style="width:22px;height:22px;border-radius:50%;background:'+bg+';color:'+fg+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">'+(i+1)+'</div>'
+        +'<div style="flex:1;min-width:0;">'
+          +'<div style="font-size:13px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+nome+'</div>'
+          +'<div style="background:#f0f0f0;border-radius:4px;height:4px;margin-top:4px;">'
+            +'<div style="background:'+barBg+';height:4px;border-radius:4px;width:'+pct+'%;"></div>'
+          +'</div>'
+        +'</div>'
+        +'<div style="font-weight:700;font-size:13px;color:#e74c3c;flex-shrink:0;">'+fmt(val)+'</div>'
+        +'</div>';
+    }).join('');
   }
 
   // Ranking por antiguidade (vencimento mais antigo)
@@ -1238,17 +1245,20 @@ function renderRankings(list){
   const divAnt = document.getElementById('rankAntigo');
   if(!rankAnt.length){ divAnt.innerHTML='<div style="color:#bbb;text-align:center;padding:16px;font-size:13px;">Nenhum débito em aberto.</div>'; }
   else {
-    divAnt.innerHTML = rankAnt.map(([nome,{venc,valor}],i)=>{
-      const dias = Math.floor((hoje-new Date(venc+'T12:00:00'))/86400000);
-      const cor = dias>180?'#e74c3c':dias>90?'#f39c12':'#F47B20';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5;">
-        <div style="width:22px;height:22px;border-radius:50%;background:${i===0?'#e74c3c':i===1?'#f39c12':i===2?'#f47b20':'#e0e0e0'};color:${i<3?'#fff':'#666'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${i+1}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nome}</div>
-          <div style="font-size:11px;color:${cor};margin-top:2px;">Desde ${fmtDate(venc)} · <strong>${dias} dias</strong> em atraso</div>
-        </div>
-        <div style="font-weight:700;font-size:13px;color:#e74c3c;flex-shrink:0;">${fmt(valor)}</div>
-      </div>`;
+    divAnt.innerHTML = rankAnt.map(function(entry,i){
+      var nome=entry[0], venc=entry[1].venc, valor=entry[1].valor;
+      var dias=Math.floor((hoje-new Date(venc+'T12:00:00'))/86400000);
+      var cor=dias>180?'#e74c3c':dias>90?'#f39c12':'#F47B20';
+      var bg=i===0?'#e74c3c':i===1?'#f39c12':i===2?'#f47b20':'#e0e0e0';
+      var fg=i<3?'#fff':'#666';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5;">'
+        +'<div style="width:22px;height:22px;border-radius:50%;background:'+bg+';color:'+fg+';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">'+(i+1)+'</div>'
+        +'<div style="flex:1;min-width:0;">'
+          +'<div style="font-size:13px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+nome+'</div>'
+          +'<div style="font-size:11px;color:'+cor+';margin-top:2px;">Desde '+fmtDate(venc)+' · <strong>'+dias+' dias</strong> em atraso</div>'
+        +'</div>'
+        +'<div style="font-weight:700;font-size:13px;color:#e74c3c;flex-shrink:0;">'+fmt(valor)+'</div>'
+        +'</div>';
     }).join('');
   }
 }
