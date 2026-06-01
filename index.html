@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CAP Consultoria — Contas a Receber</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
@@ -737,28 +738,50 @@ function salvarConfig(){
 }
 
 // ── SUPABASE REST ──────────────────────────────────────────
-async function sbReq(table,method,body,query){
-  const url=SB_URL+'/rest/v1/'+table+(query||'');
-  const prefer= method==='POST'?'resolution=merge-duplicates,return=representation': (method==='PATCH'||method==='DELETE'?'return=representation':'');
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),10000);
-  try{
-    const res=await fetch(url,{method,signal:controller.signal,headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':prefer},body:body?JSON.stringify(body):null});
-    clearTimeout(timer);
-    if(!res.ok){const t=await res.text();throw new Error(method+' '+table+': '+res.status+' — '+t);}
-    if(res.status===204)return[];
-    return res.json();
-  }catch(e){
-    clearTimeout(timer);
-    if(e.name==='AbortError')throw new Error('Timeout ao conectar ao Supabase. Verifique sua internet.');
-    throw e;
+let _supabase = null;
+
+function getClient(){
+  if(!_supabase){
+    if(typeof supabase === 'undefined'){
+      throw new Error('SDK do Supabase não carregou. Verifique sua conexão com a internet.');
+    }
+    _supabase = supabase.createClient(SB_URL, SB_KEY, {
+      auth: { persistSession: false }
+    });
   }
+  return _supabase;
 }
-const sb={
-  getAll:(t,q)=>sbReq(t,'GET',null,q||'?order=criado_em.asc'),
-  insert:(t,o)=>sbReq(t,'POST',o,''),
-  update:(t,id,o)=>sbReq(t,'PATCH',o,'?id=eq.'+id),
-  delete:(t,id)=>sbReq(t,'DELETE',null,'?id=eq.'+id),
+
+const sb = {
+  async getAll(table, q){
+    const db = getClient();
+    let query = db.from(table).select('*');
+    if(table==='clientes')    query = query.order('nome',       {ascending:true});
+    if(table==='lancamentos') query = query.order('venc',       {ascending:true});
+    if(table==='cobradores')  query = query.order('nome',       {ascending:true});
+    if(table==='atualizacoes')query = query.order('criado_em',  {ascending:false});
+    const {data,error} = await query;
+    if(error) throw new Error(error.message);
+    return data||[];
+  },
+  async insert(table, obj){
+    const db = getClient();
+    const {data,error} = await db.from(table).upsert(obj,{onConflict:'id'}).select();
+    if(error) throw new Error(error.message);
+    return data||[];
+  },
+  async update(table, id, obj){
+    const db = getClient();
+    const {data,error} = await db.from(table).update(obj).eq('id',id).select();
+    if(error) throw new Error(error.message);
+    return data||[];
+  },
+  async delete(table, id){
+    const db = getClient();
+    const {error} = await db.from(table).delete().eq('id',id);
+    if(error) throw new Error(error.message);
+    return [];
+  },
 };
 
 // ── CONVERTERS ─────────────────────────────────────────────
@@ -799,7 +822,12 @@ async function inicializar(){
     hideLoading();
     console.error('Erro Supabase:',e);
     const msg=e.message||'';
-    if(msg.includes('401')||msg.includes('403')||msg.includes('Invalid')){
+    if(msg.includes('allowlist')||msg.includes('CORS')){
+      hideLoading();
+      document.getElementById('loginScreen').style.display='flex';
+      setSyncStatus('err');
+      alert('⚠️ Domínio não autorizado no Supabase.\n\nVá em: Supabase → Project Settings → API → Allowed Origins\nAdicione: ' + window.location.origin + '\n\nOu adicione * para liberar tudo.');
+    }else if(msg.includes('401')||msg.includes('403')||msg.includes('Invalid')){
       alert('Credenciais inválidas. Verifique a configuração.');
       openModal('modalConfig');
     }else{
