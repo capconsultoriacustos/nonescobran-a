@@ -1093,7 +1093,8 @@ function loadLogins(){
 }
 function saveLogins(){ localStorage.setItem('cap_logins', JSON.stringify(logins)); }
 
-function openModalLogin(id=null){
+function openModalLogin(idOrEvent=null){
+  var id=typeof idOrEvent==='string'?idOrEvent:null;
   editLoginId=id; document.getElementById('alertLogin').innerHTML='';
   if(id){
     const l=logins.find(x=>x.id===id);
@@ -1145,15 +1146,14 @@ function renderLogins(){
   document.getElementById('countLogins').textContent=logins.length+' login(s) cadastrado(s)';
   const tb=document.getElementById('tblLogins');
   tb.innerHTML=logins.map(function(l){
+    var eBtn='<button class="action-btn" onclick="openModalLogin(this.dataset.id)" data-id="'+l.id+'">✏️</button>';
+    var dBtn=(l.id!=='admin'&&l.id!=='financeiro')?'<button class="action-btn" onclick="excluirLogin(this.dataset.id)" data-id="'+l.id+'">🗑️</button>':'';
     return '<tr>'
       +'<td><strong>'+l.usuario+'</strong></td>'
       +'<td>'+l.nome+'</td>'
       +'<td><span class="badge '+(l.perfil==='admin'?'badge-red':'badge-blue')+'">'+l.perfil+'</span></td>'
       +'<td><span class="badge '+(l.status==='Ativo'?'badge-green':'badge-gray')+'">'+l.status+'</span></td>'
-      +'<td style="white-space:nowrap;">'
-        +'<button class="action-btn" onclick="openModalLogin(''+l.id+'')">✏️</button>'
-        +(l.id!=='admin'&&l.id!=='financeiro'?'<button class="action-btn" onclick="excluirLogin(''+l.id+'')">🗑️</button>':'')
-      +'</td>'
+      +'<td style="white-space:nowrap;">'+eBtn+dBtn+'</td>'
       +'</tr>';
   }).join('');
 }
