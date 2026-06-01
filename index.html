@@ -907,4 +907,15 @@ function doLogout(){
   document.getElementById('loginUser').value='';
   document.getElementById('loginPass').value='';
 }
+function renderAll(){fillClienteSelects();fillCobradorSelects();renderDash();renderClientes();renderCobradores();renderLanc();renderAguardando();renderAdvogado();renderCobrados();renderPagos();renderAtualiz();}
+const SCREENS=['dashboard','clientes','cobradores','lancamentos','aguardando','advogado','cobrados','pagos','atualizacao'];
+function goTo(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
+  const idx=SCREENS.indexOf(id);
+  document.querySelectorAll('.nav-item')[idx]?.classList.add('active');
+  const fns={dashboard:renderDash,clientes:renderClientes,cobradores:renderCobradores,lancamentos:renderLanc,aguardando:renderAguardando,advogado:renderAdvogado,cobrados:renderCobrados,pagos:renderPagos,atualizacao:renderAtualiz};
+  if(fns[id])fns[id]();
+}
 >
