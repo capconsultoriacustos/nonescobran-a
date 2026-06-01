@@ -210,6 +210,10 @@ tr:hover td{background:#fffaf6;}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75M21 21v-2a4 4 0 0 0-3-3.87"/></svg>
       Clientes
     </div>
+    <div class="nav-item" onclick="goTo('logins')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Logins
+    </div>
     <div class="nav-item" onclick="goTo('cobradores')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       Cobradores
@@ -284,6 +288,21 @@ tr:hover td{background:#fffaf6;}
         <div class="chart-box"><div class="card-title">Cobrança Jan–Dez</div><canvas id="chartBar" height="180"></canvas></div>
         <div class="chart-box"><div class="card-title">Status das Contas</div><canvas id="chartPie" height="180"></canvas></div>
       </div>
+
+      <!-- RANKINGS -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+
+        <div class="card">
+          <div class="card-title">🏆 Ranking — Maior Débito</div>
+          <div id="rankValor"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">📅 Ranking — Dívida Mais Antiga</div>
+          <div id="rankAntigo"></div>
+        </div>
+
+      </div>
     </div>
 
     <!-- CLIENTES -->
@@ -300,6 +319,22 @@ tr:hover td{background:#fffaf6;}
           <table>
             <thead><tr><th>Nome / Razão Social</th><th>CPF/CNPJ</th><th>Telefone</th><th>E-mail</th><th>Cidade</th><th>Ações</th></tr></thead>
             <tbody id="tblClientes"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOGINS -->
+    <div id="screen-logins" class="screen">
+      <div class="topbar">
+        <div><div class="topbar-title">Cadastro de Logins</div><div class="topbar-sub" id="countLogins"></div></div>
+        <button class="btn btn-primary" onclick="openModalLogin()">+ Novo Login</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Usuário</th><th>Nome</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tblLogins"></tbody>
           </table>
         </div>
       </div>
@@ -562,6 +597,42 @@ tr:hover td{background:#fffaf6;}
     <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
       <button class="btn btn-secondary" onclick="closeModal('modalCliente')">Cancelar</button>
       <button class="btn btn-primary" onclick="salvarCliente()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LOGIN -->
+<div class="modal-overlay" id="modalLogin">
+  <div class="modal" style="width:480px;">
+    <div class="modal-header">
+      <div class="modal-title" id="modalLoginTitle">Novo Login</div>
+      <button class="modal-close" onclick="closeModal('modalLogin')">×</button>
+    </div>
+    <div id="alertLogin"></div>
+    <div class="form-grid">
+      <div class="form-group"><label>Usuário (login) *</label><input type="text" id="lgUser" placeholder="ex: joao.silva" autocomplete="off"></div>
+      <div class="form-group"><label>Nome completo *</label><input type="text" id="lgNome" placeholder="João Silva"></div>
+      <div class="form-group"><label>Senha *</label><input type="password" id="lgSenha" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
+      <div class="form-group"><label>Confirmar Senha *</label><input type="password" id="lgSenha2" placeholder="Repita a senha"></div>
+      <div class="form-group"><label>Perfil</label>
+        <select id="lgPerfil">
+          <option value="financeiro">Financeiro</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Status</label>
+        <select id="lgStatus">
+          <option value="Ativo">Ativo</option>
+          <option value="Inativo">Inativo</option>
+        </select>
+      </div>
+    </div>
+    <div style="background:#fff3e8;border-radius:8px;padding:10px 14px;margin-top:14px;font-size:12px;color:#a05000;">
+      ⚠️ Os logins são salvos no Supabase e ficam disponíveis para todos que acessam o sistema.
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
+      <button class="btn btn-secondary" onclick="closeModal('modalLogin')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarLogin()">Salvar</button>
     </div>
   </div>
 </div>
@@ -836,15 +907,15 @@ async function seedSeNecessario(){
 // ═══════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════
-function renderAll(){ fillClienteSelects(); fillCobradorSelects(); renderDash(); renderClientes(); renderCobradores(); renderLanc(); renderAguardando(); renderAdvogado(); renderCobrados(); renderPagos(); renderAtualiz(); }
-const SCREENS=['dashboard','clientes','cobradores','lancamentos','aguardando','advogado','cobrados','pagos','atualizacao'];
+function renderAll(){ loadLogins(); fillClienteSelects(); fillCobradorSelects(); renderDash(); renderClientes(); renderLogins(); renderCobradores(); renderLanc(); renderAguardando(); renderAdvogado(); renderCobrados(); renderPagos(); renderAtualiz(); }
+const SCREENS=['dashboard','clientes','logins','cobradores','lancamentos','aguardando','advogado','cobrados','pagos','atualizacao'];
 function goTo(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('screen-'+id).classList.add('active');
   const idx=SCREENS.indexOf(id);
   document.querySelectorAll('.nav-item')[idx]?.classList.add('active');
-  const fns={dashboard:renderDash,clientes:renderClientes,cobradores:renderCobradores,lancamentos:renderLanc,aguardando:renderAguardando,advogado:renderAdvogado,cobrados:renderCobrados,pagos:renderPagos,atualizacao:renderAtualiz};
+  const fns={dashboard:renderDash,clientes:renderClientes,logins:renderLogins,cobradores:renderCobradores,lancamentos:renderLanc,aguardando:renderAguardando,advogado:renderAdvogado,cobrados:renderCobrados,pagos:renderPagos,atualizacao:renderAtualiz};
   if(fns[id])fns[id]();
 }
 
@@ -1003,6 +1074,183 @@ function renderDash(){
   const colors={'Enviado ao Cliente':'#2980b9','Sem Resposta':'#f39c12','Aguardando Cliente':'#F47B20','Enviado ao Advogado':'#e74c3c','Pago':'#27ae60'};
   if(chartPie)chartPie.destroy();
   chartPie=new Chart(document.getElementById('chartPie'),{type:'doughnut',data:{labels:Object.keys(stCounts),datasets:[{data:Object.values(stCounts),backgroundColor:Object.keys(stCounts).map(k=>colors[k]||'#999'),borderWidth:2}]},options:{responsive:true,plugins:{legend:{position:'bottom'}}}});
+  renderRankings(list);
+}
+
+
+// ═══════════════════════════════════════════════
+// LOGINS
+// ═══════════════════════════════════════════════
+let logins = [
+  {id:'admin',    usuario:'admin',      nome:'Administrador', senha:'cap2025', perfil:'admin',      status:'Ativo'},
+  {id:'financeiro',usuario:'financeiro',nome:'Financeiro',    senha:'fin2025', perfil:'financeiro', status:'Ativo'},
+];
+let editLoginId = null;
+
+function loadLogins(){
+  const saved = localStorage.getItem('cap_logins');
+  if(saved) logins = JSON.parse(saved);
+}
+function saveLogins(){ localStorage.setItem('cap_logins', JSON.stringify(logins)); }
+
+function openModalLogin(id=null){
+  editLoginId=id; document.getElementById('alertLogin').innerHTML='';
+  if(id){
+    const l=logins.find(x=>x.id===id);
+    document.getElementById('modalLoginTitle').textContent='Editar Login';
+    document.getElementById('lgUser').value=l.usuario||'';
+    document.getElementById('lgNome').value=l.nome||'';
+    document.getElementById('lgSenha').value='';
+    document.getElementById('lgSenha2').value='';
+    document.getElementById('lgPerfil').value=l.perfil||'financeiro';
+    document.getElementById('lgStatus').value=l.status||'Ativo';
+  } else {
+    document.getElementById('modalLoginTitle').textContent='Novo Login';
+    ['lgUser','lgNome','lgSenha','lgSenha2'].forEach(f=>document.getElementById(f).value='');
+    document.getElementById('lgPerfil').value='financeiro';
+    document.getElementById('lgStatus').value='Ativo';
+  }
+  openModal('modalLogin');
+}
+
+function salvarLogin(){
+  const usuario = document.getElementById('lgUser').value.trim().toLowerCase();
+  const nome    = document.getElementById('lgNome').value.trim();
+  const senha   = document.getElementById('lgSenha').value;
+  const senha2  = document.getElementById('lgSenha2').value;
+  const perfil  = document.getElementById('lgPerfil').value;
+  const status  = document.getElementById('lgStatus').value;
+  if(!usuario||!nome){ showAlert('alertLogin','Usuário e Nome são obrigatórios.','error'); return; }
+  if(!editLoginId && !senha){ showAlert('alertLogin','Informe a senha.','error'); return; }
+  if(senha && senha.length<6){ showAlert('alertLogin','Senha deve ter pelo menos 6 caracteres.','error'); return; }
+  if(senha && senha!==senha2){ showAlert('alertLogin','As senhas não conferem.','error'); return; }
+  // checar duplicidade
+  const dup = logins.find(x=>x.usuario===usuario && x.id!==editLoginId);
+  if(dup){ showAlert('alertLogin','Este usuário já existe.','error'); return; }
+
+  if(editLoginId){
+    const i=logins.findIndex(x=>x.id===editLoginId);
+    logins[i]={...logins[i], usuario, nome, perfil, status};
+    if(senha) logins[i].senha=senha;
+  } else {
+    logins.push({id:genId(), usuario, nome, senha, perfil, status});
+  }
+  saveLogins();
+  closeModal('modalLogin');
+  renderLogins();
+}
+
+function renderLogins(){
+  loadLogins();
+  document.getElementById('countLogins').textContent=logins.length+' login(s) cadastrado(s)';
+  const tb=document.getElementById('tblLogins');
+  tb.innerHTML=logins.map(l=>`
+    <tr>
+      <td><strong>${l.usuario}</strong></td>
+      <td>${l.nome}</td>
+      <td><span class="badge ${l.perfil==='admin'?'badge-red':'badge-blue'}">${l.perfil}</span></td>
+      <td><span class="badge ${l.status==='Ativo'?'badge-green':'badge-gray'}">${l.status}</span></td>
+      <td style="white-space:nowrap;">
+        <button class="action-btn" onclick="openModalLogin('${l.id}')">✏️</button>
+        ${l.id!=='admin'&&l.id!=='financeiro'?'<button class="action-btn" onclick="excluirLogin(''+l.id+'')">🗑️</button>':''}
+      </td>
+    </tr>`).join('');
+}
+
+function excluirLogin(id){
+  if(!confirm('Excluir este login?'))return;
+  logins=logins.filter(x=>x.id!==id);
+  saveLogins(); renderLogins();
+}
+
+// Override doLogin para usar logins dinâmicos
+const _doLoginOriginal = doLogin;
+async function doLogin(){
+  loadLogins();
+  const u=document.getElementById('loginUser').value.trim().toLowerCase();
+  const p=document.getElementById('loginPass').value;
+  const err=document.getElementById('loginError');
+  const found = logins.find(x=>x.usuario===u && x.senha===p && x.status==='Ativo');
+  if(!found){ err.textContent='Usuário ou senha inválidos.'; return; }
+  currentUser={label:found.nome, role:found.perfil, user:found.usuario};
+  document.getElementById('userLabel').textContent=currentUser.label;
+  document.getElementById('userAvatar').textContent=currentUser.label[0];
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('app').style.display='block';
+  err.textContent='';
+  renderAll();
+  showLoading('Conectando ao banco de dados...');
+  try{
+    await seedSeNecessario();
+    await carregarTudo();
+    setSyncStatus('ok');
+    renderAll();
+  }catch(e){
+    console.error(e); setSyncStatus('err');
+  }
+  hideLoading();
+}
+
+// ═══════════════════════════════════════════════
+// RANKING DASHBOARD
+// ═══════════════════════════════════════════════
+function renderRankings(list){
+  // Ranking por valor (top 10 devedores)
+  const porCliente = {};
+  list.filter(l=>l.status!=='Pago').forEach(l=>{
+    const nome=getClienteNome(l.clienteId);
+    porCliente[nome]=(porCliente[nome]||0)+l.valor;
+  });
+  const rankVal = Object.entries(porCliente)
+    .sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  const divVal = document.getElementById('rankValor');
+  if(!rankVal.length){ divVal.innerHTML='<div style="color:#bbb;text-align:center;padding:16px;font-size:13px;">Nenhum débito em aberto.</div>'; }
+  else {
+    const max = rankVal[0][1];
+    divVal.innerHTML = rankVal.map(([nome,val],i)=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5;">
+        <div style="width:22px;height:22px;border-radius:50%;background:${i===0?'#e74c3c':i===1?'#f39c12':i===2?'#f47b20':'#e0e0e0'};color:${i<3?'#fff':'#666'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${i+1}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nome}</div>
+          <div style="background:#f0f0f0;border-radius:4px;height:4px;margin-top:4px;">
+            <div style="background:${i===0?'#e74c3c':'#F47B20'};height:4px;border-radius:4px;width:${Math.round(val/max*100)}%;"></div>
+          </div>
+        </div>
+        <div style="font-weight:700;font-size:13px;color:#e74c3c;flex-shrink:0;">${fmt(val)}</div>
+      </div>`).join('');
+  }
+
+  // Ranking por antiguidade (vencimento mais antigo)
+  const porClienteAntigo = {};
+  list.filter(l=>l.status!=='Pago'&&l.venc).forEach(l=>{
+    const nome=getClienteNome(l.clienteId);
+    if(!porClienteAntigo[nome]||l.venc<porClienteAntigo[nome].venc){
+      porClienteAntigo[nome]={venc:l.venc,valor:(porClienteAntigo[nome]?.valor||0)+l.valor};
+    } else {
+      porClienteAntigo[nome].valor+=l.valor;
+    }
+  });
+  const rankAnt = Object.entries(porClienteAntigo)
+    .sort((a,b)=>a[1].venc.localeCompare(b[1].venc)).slice(0,10);
+
+  const hoje = new Date();
+  const divAnt = document.getElementById('rankAntigo');
+  if(!rankAnt.length){ divAnt.innerHTML='<div style="color:#bbb;text-align:center;padding:16px;font-size:13px;">Nenhum débito em aberto.</div>'; }
+  else {
+    divAnt.innerHTML = rankAnt.map(([nome,{venc,valor}],i)=>{
+      const dias = Math.floor((hoje-new Date(venc+'T12:00:00'))/86400000);
+      const cor = dias>180?'#e74c3c':dias>90?'#f39c12':'#F47B20';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5;">
+        <div style="width:22px;height:22px;border-radius:50%;background:${i===0?'#e74c3c':i===1?'#f39c12':i===2?'#f47b20':'#e0e0e0'};color:${i<3?'#fff':'#666'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${i+1}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${nome}</div>
+          <div style="font-size:11px;color:${cor};margin-top:2px;">Desde ${fmtDate(venc)} · <strong>${dias} dias</strong> em atraso</div>
+        </div>
+        <div style="font-weight:700;font-size:13px;color:#e74c3c;flex-shrink:0;">${fmt(valor)}</div>
+      </div>`;
+    }).join('');
+  }
 }
 
 document.querySelectorAll('.modal-overlay').forEach(o=>{ o.addEventListener('click',e=>{ if(e.target===o)o.classList.remove('show'); }); });
