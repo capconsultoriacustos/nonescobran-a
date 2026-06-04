@@ -279,6 +279,7 @@ tr:hover td { background: #fafafa; }
 
 <!-- APP -->
 <div id="app">
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sidebar-logo">
@@ -298,7 +299,12 @@ tr:hover td { background: #fafafa; }
   <!-- MAIN -->
   <div class="main">
     <div class="topbar">
-      <div class="topbar-title" id="topbar-title">Dashboard Financeiro</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="hamburger-btn" id="hamburger-btn" onclick="toggleSidebar()" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="topbar-title" id="topbar-title">Dashboard Financeiro</div>
+      </div>
       <div class="topbar-right">
         <span id="topbar-date" style="font-size:12px;color:var(--gray);"></span>
         <span id="sync-status" style="font-size:11px;color:var(--gray);"></span>
@@ -2137,7 +2143,162 @@ function printRecibo() {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #f5f5f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; font-family: Arial, sans-serif; }
-    @media print {
+    
+/* ============================================================
+   MOBILE RESPONSIVE
+   ============================================================ */
+
+/* Hamburguer button - hidden on desktop */
+.hamburger-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  flex-direction: column;
+  gap: 5px;
+  margin-right: 8px;
+}
+.hamburger-btn span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: var(--gray-dark);
+  border-radius: 2px;
+  transition: all 0.3s;
+}
+
+/* Overlay for sidebar on mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 99;
+}
+.sidebar-overlay.active { display: block; }
+
+@media (max-width: 768px) {
+
+  /* Sidebar: hidden by default on mobile */
+  .sidebar {
+    position: fixed;
+    left: -240px;
+    top: 0;
+    height: 100vh;
+    z-index: 200;
+    transition: left 0.3s ease;
+    width: 240px !important;
+  }
+  .sidebar.open { left: 0; }
+
+  /* Main: full width on mobile */
+  .main { margin-left: 0 !important; }
+
+  /* Topbar adjustments */
+  .topbar {
+    padding: 0 12px;
+    height: 52px;
+  }
+  .topbar-title { font-size: 15px; }
+  .topbar-right { gap: 6px; }
+  #topbar-date { display: none; }
+  #sync-status { display: none; }
+  .user-badge { font-size: 11px; padding: 4px 8px; }
+  #btn-sync { font-size: 11px; padding: 5px 8px; }
+
+  /* Show hamburger on mobile */
+  .hamburger-btn { display: flex; }
+
+  /* Content padding */
+  .content { padding: 12px; }
+
+  /* KPI grid: 2 columns */
+  .kpi-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .kpi-card { padding: 14px; }
+  .kpi-card .kpi-value { font-size: 20px; }
+
+  /* Tables: turn into cards on mobile */
+  table { display: block; }
+  thead { display: none; }
+  tbody { display: block; }
+  tr {
+    display: block;
+    margin-bottom: 10px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+  }
+  td {
+    display: flex;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 13px;
+    border: none;
+    gap: 8px;
+  }
+  td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--gray);
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+  td:first-child { padding-top: 2px; }
+  td:last-child { padding-bottom: 2px; margin-top: 4px; }
+  .action-row { flex-wrap: wrap; gap: 6px; }
+  .action-row .btn { font-size: 12px; padding: 5px 8px; }
+
+  /* Filters: stack */
+  .filters { flex-wrap: wrap; gap: 8px; }
+  .filters select, .filters input { font-size: 13px; }
+
+  /* Modals: full screen on mobile */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+  .modal-body { padding: 16px; }
+  .field { margin-bottom: 12px; }
+  .field input, .field select, .field textarea { font-size: 16px; } /* prevent iOS zoom */
+
+  /* Buttons */
+  .btn-primary { font-size: 13px; padding: 8px 14px; }
+  .page-header { flex-wrap: wrap; gap: 8px; }
+  .page-title { font-size: 18px; }
+
+  /* Cards */
+  .card { border-radius: 10px; }
+  .card-body { padding: 12px; }
+
+  /* Timer on tarefas */
+  .timer-display { font-size: 12px !important; padding: 3px 6px !important; }
+
+  /* Kanban */
+  .kanban-col { min-width: 280px; }
+
+  /* Calendar */
+  .cal-header { font-size: 13px; }
+
+  /* Hide some less important columns on mobile */
+  td[data-col="leadtime"],
+  td[data-col="tempo"] { display: none; }
+}
+
+@media (max-width: 400px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+  .topbar-title { font-size: 13px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+@media print {
       body { background: white; padding: 0; }
       @page { margin: 10mm; size: A4; }
     }
@@ -2978,6 +3139,27 @@ async function excluirReuniao() {
   renderCalendario();
 }
 let _autoRefreshInterval = null;
+
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('active');
+}
+function closeSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  sidebar.classList.remove('open');
+  overlay.classList.remove('active');
+}
+// Close sidebar when nav item is clicked on mobile
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.nav-item').forEach(function(item) {
+    item.addEventListener('click', function() {
+      if (window.innerWidth <= 768) closeSidebar();
+    });
+  });
+});
 let _ultimaSalvagem = 0;
 
 async function sincronizarDados(silencioso = false) {
