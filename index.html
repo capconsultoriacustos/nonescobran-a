@@ -800,6 +800,28 @@ let currentUser=null, editClienteId=null, editLancId=null, editCobradorId=null;
 let currentFuLancId=null, tempFollowups=[], statusLancId=null, confMarcados=new Set();
 
 // ═══════════════════════════════════════════════
+// PING — mantém Supabase ativo (evita pausa gratuita)
+// ═══════════════════════════════════════════════
+(function pingSupabase(){
+  const LS_PING = 'cap_sb_ping';
+  const INTERVALO = 3 * 24 * 60 * 60 * 1000; // 3 dias em ms
+  const ultimo = parseInt(localStorage.getItem(LS_PING) || '0');
+  if(Date.now() - ultimo < INTERVALO) return; // ainda não é hora
+  // Faz um fetch leve — só 1 linha da tabela lancamentos
+  fetch(SB_URL + '/rest/v1/lancamentos?select=id&limit=1', {
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + SB_KEY
+    }
+  }).then(r => {
+    if(r.ok) {
+      localStorage.setItem(LS_PING, Date.now().toString());
+      console.info('Supabase ping ok — próximo em 3 dias');
+    }
+  }).catch(() => {}); // silencioso se offline
+})();
+
+// ═══════════════════════════════════════════════
 // LOCALSTORAGE — persistência local
 // ═══════════════════════════════════════════════
 const LS_KEY = 'cap_receber_db';
