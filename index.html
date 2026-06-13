@@ -831,7 +831,7 @@ function getSB(){
 }
 const sb = {
   async getAll(t, order){ const db=getSB(); let q=db.from(t).select('*'); if(order)q=q.order(order,{ascending:order!=='criado_em'}); const{data,error}=await q; if(error)throw new Error(error.message); return data||[]; },
-  async upsert(t,obj){ const db=getSB(); const{data,error}=await db.from(t).upsert(obj,{onConflict:'id'}).select(); if(error)throw new Error(error.message); return data||[]; },
+  async upsert(t,obj){ const db=getSB(); const{error}=await db.from(t).upsert(obj,{onConflict:'id'}); if(error)throw new Error(error.message); return []; },
   async update(t,id,obj){ const db=getSB(); const{error}=await db.from(t).update(obj).eq('id',id); if(error)throw new Error(error.message); },
   async delete(t,id){ const db=getSB(); const{error}=await db.from(t).delete().eq('id',id); if(error)throw new Error(error.message); },
 };
