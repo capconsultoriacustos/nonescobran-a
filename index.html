@@ -798,6 +798,31 @@ const SEED_LANC     = [{"id": "8r3305ht", "clienteId": "7ca0024e", "desc": "EUCA
 let clientes=[], lancamentos=[], cobradores=[], atualizacoes=[];
 let currentUser=null, editClienteId=null, editLancId=null, editCobradorId=null;
 let currentFuLancId=null, tempFollowups=[], statusLancId=null, confMarcados=new Set();
+
+// ═══════════════════════════════════════════════
+// LOCALSTORAGE — persistência local
+// ═══════════════════════════════════════════════
+const LS_KEY = 'cap_receber_db';
+function salvarLocal(){
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      clientes, lancamentos, cobradores, atualizacoes,
+      ts: Date.now()
+    }));
+  }catch(e){ console.warn('localStorage cheio:', e.message); }
+}
+function carregarLocal(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return false;
+    const d = JSON.parse(raw);
+    if(d.clientes   && d.clientes.length)   clientes     = d.clientes;
+    if(d.lancamentos&& d.lancamentos.length) lancamentos  = d.lancamentos;
+    if(d.cobradores && d.cobradores.length)  cobradores   = d.cobradores;
+    if(d.atualizacoes)                       atualizacoes = d.atualizacoes;
+    return true;
+  }catch(e){ return false; }
+}
 let chartBar=null, chartPie=null, _sb=null;
 
 // ═══════════════════════════════════════════════
@@ -865,11 +890,11 @@ async function doLogin(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='block';
   err.textContent='';
-  // Carrega SEED imediatamente — tela já fica funcional
-  clientes    = SEED_CLIENTES.map(fromCli);
-  lancamentos = SEED_LANC.map(fromLanc);
-  cobradores  = [];
-  atualizacoes= [];
+  // Carrega localStorage (dados da sessão anterior) ou SEED como fallback
+  if(!carregarLocal()){
+    clientes    = SEED_CLIENTES.map(fromCli);
+    lancamentos = SEED_LANC.map(fromLanc);
+  }
   renderAll();
   // Tenta Supabase em background sem bloquear
   setSyncStatus('syncing');
@@ -910,6 +935,7 @@ async function carregarDoSupabase(){
     lancamentos  = rLanc.map(fromLanc);
     cobradores   = rCob.map(fromCob);
     atualizacoes = rAtualiz.map(fromAtualiz);
+    salvarLocal();
     setSyncStatus('ok');
     renderAll();
     console.info('Supabase carregado.');
@@ -982,8 +1008,7 @@ async function salvarCliente(){
   const obj={id:editClienteId||genId(),nome,doc:document.getElementById('cDoc').value.trim(),tel:document.getElementById('cTel').value.trim(),email:document.getElementById('cEmail').value.trim(),cidade:document.getElementById('cCidade').value.trim(),estado:document.getElementById('cEstado').value,obs:document.getElementById('cObs').value.trim()};
   // Salva localmente imediatamente
   if(editClienteId){const i=clientes.findIndex(x=>x.id===editClienteId);clientes[i]=obj;}else{clientes.push(obj);}
-  closeModal('modalCliente'); renderClientes(); fillClienteSelects();
-  // Tenta sincronizar com Supabase em background
+  salvarLocal(); closeModal('modalCliente'); renderClientes(); fillClienteSelects();
   try{ setSyncStatus('syncing'); await sb.upsert('clientes',toCli(obj)); setSyncStatus('ok'); }
   catch(e){ console.warn('Supabase offline, salvo local:', e.message); setSyncStatus('offline'); }
 }
@@ -995,7 +1020,7 @@ function renderClientes(){
   if(!list.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#bbb;padding:24px;">Nenhum cliente.</td></tr>';return;}
   tb.innerHTML=list.map(c=>'<tr><td><strong>'+c.nome+'</strong></td><td>'+(c.doc||'—')+'</td><td>'+(c.tel||'—')+'</td><td>'+(c.email||'—')+'</td><td>'+(c.cidade||'—')+(c.estado?' — '+c.estado:'')+'</td><td><button class="action-btn" onclick="openModalCliente(\''+c.id+'\')">✏️</button><button class="action-btn" onclick="excluirCliente(\''+c.id+'\')">🗑️</button></td></tr>').join('');
 }
-async function excluirCliente(id){ if(!confirm('Excluir cliente?'))return; clientes=clientes.filter(x=>x.id!==id);renderClientes();fillClienteSelects();try{setSyncStatus('syncing');await sb.delete('clientes',id);setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
+async function excluirCliente(id){ if(!confirm('Excluir cliente?'))return; clientes=clientes.filter(x=>x.id!==id);salvarLocal();renderClientes();fillClienteSelects();try{setSyncStatus('syncing');await sb.delete('clientes',id);setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
 
 // ═══════════════════════════════════════════════
 // COBRADORES
@@ -1010,7 +1035,7 @@ async function salvarCobrador(){
   const nome=document.getElementById('cbNome').value.trim(); if(!nome){showAlert('alertCobrador','Nome é obrigatório.','error');return;}
   const obj={id:editCobradorId||genId(),nome,cargo:document.getElementById('cbCargo').value.trim(),tel:document.getElementById('cbTel').value.trim(),email:document.getElementById('cbEmail').value.trim(),status:document.getElementById('cbStatus').value,obs:document.getElementById('cbObs').value.trim()};
   if(editCobradorId){const i=cobradores.findIndex(x=>x.id===editCobradorId);cobradores[i]=obj;}else{cobradores.push(obj);}
-  closeModal('modalCobrador'); renderCobradores(); fillCobradorSelects();
+  salvarLocal(); closeModal('modalCobrador'); renderCobradores(); fillCobradorSelects();
   try{ setSyncStatus('syncing'); await sb.upsert('cobradores',toCob(obj)); setSyncStatus('ok'); }
   catch(e){ console.warn('Supabase offline, salvo local:', e.message); setSyncStatus('offline'); }
 }
@@ -1022,7 +1047,7 @@ function renderCobradores(){
   if(!list.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#bbb;padding:24px;">Nenhum cobrador.</td></tr>';return;}
   tb.innerHTML=list.map(c=>'<tr><td><strong>'+c.nome+'</strong></td><td>'+(c.cargo||'—')+'</td><td>'+(c.tel||'—')+'</td><td>'+(c.email||'—')+'</td><td><span class="badge '+(c.status==='Ativo'?'badge-green':'badge-gray')+'">'+c.status+'</span></td><td><button class="action-btn" onclick="openModalCobrador(\''+c.id+'\')">✏️</button><button class="action-btn" onclick="excluirCobrador(\''+c.id+'\')">🗑️</button></td></tr>').join('');
 }
-async function excluirCobrador(id){ if(!confirm('Excluir cobrador?'))return; cobradores=cobradores.filter(x=>x.id!==id);renderCobradores();fillCobradorSelects();try{setSyncStatus('syncing');await sb.delete('cobradores',id);setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
+async function excluirCobrador(id){ if(!confirm('Excluir cobrador?'))return; cobradores=cobradores.filter(x=>x.id!==id);salvarLocal();renderCobradores();fillCobradorSelects();try{setSyncStatus('syncing');await sb.delete('cobradores',id);setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
 
 // ═══════════════════════════════════════════════
 // LANÇAMENTOS
@@ -1047,7 +1072,7 @@ async function salvarLanc(){
   const ex=editLancId?lancamentos.find(x=>x.id===editLancId):null;
   const obj={id:editLancId||genId(),clienteId,desc,valor,venc,status,valorCob:parseFloat(document.getElementById('lValorCob').value)||0,cobradorId:document.getElementById('lCobrador').value||null,obs:document.getElementById('lObs').value.trim(),dataPago:status==='Pago'?document.getElementById('lDataPago').value||today():null,obsPago:status==='Pago'?document.getElementById('lObsPago').value.trim():'',dataEntrada:ex?.dataEntrada||null,respEntrada:ex?.respEntrada||null,followups:[...tempFollowups],criadoEm:ex?.criadoEm||today()};
   if(editLancId){const i=lancamentos.findIndex(x=>x.id===editLancId);lancamentos[i]=obj;}else{lancamentos.push(obj);}
-  closeModal('modalLanc'); if(status==='Pago')goTo('pagos'); renderLanc();renderAguardando();renderAdvogado();renderCobrados();renderPagos();renderDash();
+  salvarLocal(); closeModal('modalLanc'); if(status==='Pago')goTo('pagos'); renderLanc();renderAguardando();renderAdvogado();renderCobrados();renderPagos();renderDash();
   try{ setSyncStatus('syncing'); await sb.upsert('lancamentos',toLanc(obj)); setSyncStatus('ok'); }
   catch(e){ console.warn('Supabase offline, salvo local:', e.message); setSyncStatus('offline'); }
 }
@@ -1060,24 +1085,24 @@ function renderLanc(){
   if(!list.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#bbb;padding:24px;">Nenhum lançamento.</td></tr>';return;}
   tb.innerHTML=list.map(l=>{ const fu=l.followups?.length?l.followups[0]:null; const vencido=l.status!=='Pago'&&new Date(l.venc+'T12:00:00')<new Date(); const cobNome=l.cobradorId?'<span class="badge badge-purple">'+getCobradorNome(l.cobradorId)+'</span>':'<span style="color:#bbb">—</span>'; return '<tr><td><strong>'+getClienteNome(l.clienteId)+'</strong></td><td><span class="badge badge-gray">'+l.desc+'</span></td><td style="color:'+(vencido?'#e74c3c':'inherit')+'">'+fmtDate(l.venc)+(vencido?' ⚠️':'')+'</td><td><strong>'+fmt(l.valor)+'</strong></td><td>'+cobNome+'</td><td>'+statusBadge(l.status)+'</td><td>'+sistFinBadge(l)+'</td><td style="font-size:11px;color:#999;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(fu?fu.texto:'—')+'</td><td style="white-space:nowrap;"><button class="action-btn" onclick="openFollowupRapido(\''+l.id+'\')">💬</button><button class="action-btn" onclick="verFollowups(\''+l.id+'\')">📋</button><button class="action-btn" onclick="openStatus(\''+l.id+'\')">🔄</button><button class="action-btn" onclick="openModalLanc(\''+l.id+'\')">✏️</button>'+(l.dataEntrada?btnReverter(l.id):'')+'<button class="action-btn" onclick="excluirLanc(\''+l.id+'\')">🗑️</button></td></tr>'; }).join('');
 }
-async function excluirLanc(id){ if(!confirm('Excluir?'))return; lancamentos=lancamentos.filter(x=>x.id!==id);renderLanc();renderAguardando();renderAdvogado();renderCobrados();renderPagos();renderDash();try{setSyncStatus('syncing');await sb.delete('lancamentos',id);setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
+async function excluirLanc(id){ if(!confirm('Excluir?'))return; lancamentos=lancamentos.filter(x=>x.id!==id);salvarLocal();renderLanc();renderAguardando();renderAdvogado();renderCobrados();renderPagos();renderDash();try{setSyncStatus('syncing');await sb.delete('lancamentos',id);setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
 
 // ── FOLLOWUP ──
 function openFollowupRapido(id){ currentFuLancId=id; document.getElementById('fuText').value=''; openModal('modalFollowup'); }
-async function salvarFollowupRapido(){ const txt=document.getElementById('fuText').value.trim(), tipo=document.getElementById('fuTipo').value; if(!txt)return; const l=lancamentos.find(x=>x.id===currentFuLancId); if(!l)return; if(!l.followups)l.followups=[]; l.followups.unshift({id:genId(),texto:txt,tipo,data:new Date().toLocaleString('pt-BR'),user:currentUser?.label||'Sistema'}); closeModal('modalFollowup');renderLanc();renderAguardando();renderAdvogado();try{setSyncStatus('syncing');await sb.update('lancamentos',l.id,{followups:l.followups});setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
+async function salvarFollowupRapido(){ const txt=document.getElementById('fuText').value.trim(), tipo=document.getElementById('fuTipo').value; if(!txt)return; const l=lancamentos.find(x=>x.id===currentFuLancId); if(!l)return; if(!l.followups)l.followups=[]; l.followups.unshift({id:genId(),texto:txt,tipo,data:new Date().toLocaleString('pt-BR'),user:currentUser?.label||'Sistema'}); salvarLocal();closeModal('modalFollowup');renderLanc();renderAguardando();renderAdvogado();try{setSyncStatus('syncing');await sb.update('lancamentos',l.id,{followups:l.followups});setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
 function verFollowups(id){ const l=lancamentos.find(x=>x.id===id); document.getElementById('titleVerFU').textContent='Follow-ups — '+getClienteNome(l.clienteId); const div=document.getElementById('listaVerFU'); if(!l.followups?.length){div.innerHTML='<div style="color:#bbb;text-align:center;padding:20px;">Nenhum follow-up.</div>';}else{div.innerHTML=l.followups.map(f=>'<div class="followup-item '+(f.tipo==='Advogado'?'adv':f.tipo==='Pagamento'?'pago':'')+'"><div class="followup-meta"><span class="badge badge-orange">'+f.tipo+'</span><span>'+f.data+'</span><span>por '+f.user+'</span></div><div class="followup-text">'+f.texto+'</div></div>').join('');} openModal('modalVerFU'); }
 
 // ── STATUS ──
 function openStatus(id){ statusLancId=id; const l=lancamentos.find(x=>x.id===id); document.getElementById('novoStatus').value=l.status; document.getElementById('painelStatusPago').style.display='none'; document.getElementById('sDataPago').value=''; document.getElementById('sObsPago').value=''; openModal('modalStatus'); }
-async function confirmarStatus(){ const l=lancamentos.find(x=>x.id===statusLancId); if(!l)return; const ns=document.getElementById('novoStatus').value; l.status=ns; if(ns==='Pago'){l.dataPago=document.getElementById('sDataPago').value||today();l.obsPago=document.getElementById('sObsPago').value.trim();} closeModal('modalStatus');if(ns==='Pago')goTo('pagos');renderLanc();renderAguardando();renderAdvogado();renderCobrados();renderPagos();renderDash();try{setSyncStatus('syncing');await sb.upsert('lancamentos',toLanc(l));setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
+async function confirmarStatus(){ const l=lancamentos.find(x=>x.id===statusLancId); if(!l)return; const ns=document.getElementById('novoStatus').value; l.status=ns; if(ns==='Pago'){l.dataPago=document.getElementById('sDataPago').value||today();l.obsPago=document.getElementById('sObsPago').value.trim();} salvarLocal();closeModal('modalStatus');if(ns==='Pago')goTo('pagos');renderLanc();renderAguardando();renderAdvogado();renderCobrados();renderPagos();renderDash();try{setSyncStatus('syncing');await sb.upsert('lancamentos',toLanc(l));setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
 
 // ── SUB-TELAS ──
 function renderAguardando(){ const list=lancamentos.filter(l=>l.status==='Aguardando Cliente'); document.getElementById('countAguard').textContent=list.length+' lançamento(s)'; const tb=document.getElementById('tblAguardando'); if(!list.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:#bbb;padding:24px;">Nenhum.</td></tr>';return;} tb.innerHTML=list.map(l=>{ const fu=l.followups?.length?l.followups[0]:null; const cobNome=l.cobradorId?'<span class="badge badge-purple">'+getCobradorNome(l.cobradorId)+'</span>':'<span style="color:#bbb">—</span>'; return '<tr><td><strong>'+getClienteNome(l.clienteId)+'</strong></td><td><span class="badge badge-gray">'+l.desc+'</span></td><td>'+fmtDate(l.venc)+'</td><td>'+fmt(l.valor)+'</td><td>'+cobNome+'</td><td>'+sistFinBadge(l)+'</td><td style="font-size:11px;color:#999;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(fu?fu.texto:'—')+'</td><td style="white-space:nowrap;"><button class="action-btn" onclick="openFollowupRapido(\''+l.id+'\')">💬</button><button class="action-btn" onclick="verFollowups(\''+l.id+'\')">📋</button><button class="action-btn" onclick="openStatus(\''+l.id+'\')">🔄</button>'+(l.dataEntrada?btnReverter(l.id):'')+'</td></tr>'; }).join(''); }
 function renderAdvogado(){ const list=lancamentos.filter(l=>l.status==='Enviado ao Advogado'); document.getElementById('countAdv').textContent=list.length+' lançamento(s) — Total: '+fmt(list.reduce((s,l)=>s+l.valor,0)); const tb=document.getElementById('tblAdvogado'); if(!list.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#bbb;padding:24px;">Nenhum.</td></tr>';return;} tb.innerHTML=list.map(l=>{ const fu=l.followups?.find(f=>f.tipo==='Advogado')||l.followups?.[0]; const cobNome=l.cobradorId?'<span class="badge badge-purple">'+getCobradorNome(l.cobradorId)+'</span>':'<span style="color:#bbb">—</span>'; return '<tr><td><strong>'+getClienteNome(l.clienteId)+'</strong></td><td><span class="badge badge-gray">'+l.desc+'</span></td><td>'+fmtDate(l.venc)+'</td><td><strong>'+fmt(l.valor)+'</strong></td><td>'+cobNome+'</td><td style="font-size:12px;">'+(fu?fu.data:fmtDate(l.criadoEm))+'</td><td>'+sistFinBadge(l)+'</td><td style="font-size:11px;color:#999;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(fu?fu.texto:'—')+'</td><td style="white-space:nowrap;"><button class="action-btn" onclick="openFollowupRapido(\''+l.id+'\')">💬</button><button class="action-btn" onclick="verFollowups(\''+l.id+'\')">📋</button><button class="action-btn" onclick="openStatus(\''+l.id+'\')">🔄</button>'+(l.dataEntrada?btnReverter(l.id):'')+'</td></tr>'; }).join(''); }
 function renderCobrados(){ const st=document.getElementById('filtStatusCob')?.value||''; let list=lancamentos.filter(l=>l.valorCob>0); if(st)list=list.filter(l=>l.status===st); document.getElementById('countCob').textContent=list.length+' registro(s)'; const tb=document.getElementById('tblCobrados'); if(!list.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#bbb;padding:24px;">Nenhum.</td></tr>';return;} tb.innerHTML=list.map(l=>{ const cobNome=l.cobradorId?'<span class="badge badge-purple">'+getCobradorNome(l.cobradorId)+'</span>':'<span style="color:#bbb">—</span>'; return '<tr><td><strong>'+getClienteNome(l.clienteId)+'</strong></td><td><span class="badge badge-gray">'+l.desc+'</span></td><td>'+fmtDate(l.venc)+'</td><td>'+fmt(l.valor)+'</td><td><strong style="color:var(--orange)">'+fmt(l.valorCob)+'</strong></td><td>'+cobNome+'</td><td>'+statusBadge(l.status)+'</td><td>'+sistFinBadge(l)+'</td><td style="white-space:nowrap;"><button class="action-btn" onclick="openModalLanc(\''+l.id+'\')">✏️</button><button class="action-btn" onclick="openStatus(\''+l.id+'\')">🔄</button>'+(l.dataEntrada?btnReverter(l.id):'')+'</td></tr>'; }).join(''); }
 function renderPagos(){ const mes=document.getElementById('filtMesPagos')?.value||'', ano=document.getElementById('filtAnoPagos')?.value||''; let list=lancamentos.filter(l=>l.status==='Pago'); if(mes)list=list.filter(l=>new Date((l.dataPago||l.venc)+'T12:00:00').getMonth()+1===parseInt(mes)); if(ano)list=list.filter(l=>new Date((l.dataPago||l.venc)+'T12:00:00').getFullYear()===parseInt(ano)); list.sort((a,b)=>(b.dataPago||b.venc).localeCompare(a.dataPago||a.venc)); const total=list.reduce((s,l)=>s+l.valor,0), totalCob=list.reduce((s,l)=>s+(l.valorCob||0),0); document.getElementById('countPagos').textContent=list.length+' conta(s) — Total: '+fmt(total); document.getElementById('resumoPagos').innerHTML='<div class="kpi green"><div class="kpi-label">Total Recebido</div><div class="kpi-value">'+fmt(total)+'</div><div class="kpi-sub">'+list.length+' pagamentos</div></div><div class="kpi blue"><div class="kpi-label">Valor Cobrado</div><div class="kpi-value">'+fmt(totalCob)+'</div><div class="kpi-sub">Cobranças registradas</div></div><div class="kpi"><div class="kpi-label">Ticket Médio</div><div class="kpi-value">'+fmt(list.length?total/list.length:0)+'</div><div class="kpi-sub">Por pagamento</div></div>'; const tb=document.getElementById('tblPagos'); if(!list.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:#bbb;padding:24px;">Nenhuma conta paga.</td></tr>';return;} tb.innerHTML=list.map(l=>{ const cobNome=l.cobradorId?'<span class="badge badge-purple">'+getCobradorNome(l.cobradorId)+'</span>':'<span style="color:#bbb">—</span>'; return '<tr><td><strong>'+getClienteNome(l.clienteId)+'</strong></td><td><span class="badge badge-gray">'+l.desc+'</span></td><td>'+fmtDate(l.venc)+'</td><td><span class="badge badge-green">'+fmtDate(l.dataPago||l.venc)+'</span></td><td><strong style="color:var(--success)">'+fmt(l.valor)+'</strong></td><td>'+cobNome+'</td><td>'+sistFinBadge(l)+'</td><td style="font-size:12px;color:#666;">'+(l.obsPago||'—')+'</td><td style="white-space:nowrap;"><button class="action-btn" onclick="openModalLanc(\''+l.id+'\')">✏️</button>'+(l.dataEntrada?btnReverter(l.id):'')+'<button class="action-btn" onclick="reabrirLanc(\''+l.id+'\')" style="color:#f39c12;" title="Reabrir">↺</button></td></tr>'; }).join(''); }
-async function reabrirLanc(id){ if(!confirm('Reabrir?'))return; const l=lancamentos.find(x=>x.id===id); if(!l)return; l.status='Enviado ao Cliente';l.dataPago=null;l.obsPago=''; renderPagos();renderLanc();renderDash();try{setSyncStatus('syncing');await sb.upsert('lancamentos',toLanc(l));setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
-async function reverterEntrada(id){ if(!confirm('Reverter entrada no sistema financeiro?'))return; const l=lancamentos.find(x=>x.id===id); if(!l)return; l.dataEntrada=null;l.respEntrada=null; renderConferencia();renderLanc();renderAguardando();renderAdvogado();renderCobrados();renderPagos();try{setSyncStatus('syncing');await sb.update('lancamentos',id,{data_entrada:null,resp_entrada:null});setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
+async function reabrirLanc(id){ if(!confirm('Reabrir?'))return; const l=lancamentos.find(x=>x.id===id); if(!l)return; l.status='Enviado ao Cliente';l.dataPago=null;l.obsPago=''; salvarLocal();renderPagos();renderLanc();renderDash();try{setSyncStatus('syncing');await sb.upsert('lancamentos',toLanc(l));setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
+async function reverterEntrada(id){ if(!confirm('Reverter entrada no sistema financeiro?'))return; const l=lancamentos.find(x=>x.id===id); if(!l)return; l.dataEntrada=null;l.respEntrada=null; salvarLocal();renderConferencia();renderLanc();renderAguardando();renderAdvogado();renderCobrados();renderPagos();try{setSyncStatus('syncing');await sb.update('lancamentos',id,{data_entrada:null,resp_entrada:null});setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
 
 // ═══════════════════════════════════════════════
 // CONFERÊNCIA
@@ -1089,11 +1114,11 @@ function desmarcarTodos(){ confMarcados.clear(); renderConferencia(); }
 async function confirmarAtualizacao(){ const resp=document.getElementById('confResp').value.trim(), data=document.getElementById('confData').value; if(!resp||!data){alert('Preencha Responsável e Data.');return;} if(confMarcados.size===0){alert('Marque pelo menos um lançamento.');return;} const itensConferidos=[...confMarcados].map(id=>{ const l=lancamentos.find(x=>x.id===id); return l?{id,cliente:getClienteNome(l.clienteId),desc:l.desc,valor:l.valor,venc:l.venc,status:l.status}:null; }).filter(Boolean); const reg={id:genId(),resp,data,obs:document.getElementById('confObs').value.trim(),itens:itensConferidos,total:itensConferidos.reduce((s,i)=>s+i.valor,0)}; // Aplica localmente
   itensConferidos.forEach(item=>{ const l=lancamentos.find(x=>x.id===item.id); if(l){l.dataEntrada=data;l.respEntrada=resp;} });
   atualizacoes.unshift({...reg,criadoEm:today()}); confMarcados.clear(); document.getElementById('confResp').value=''; document.getElementById('confObs').value='';
-  renderConferencia();renderAtualiz();renderLanc();renderAguardando();renderAdvogado();renderCobrados();renderPagos();
+  salvarLocal(); renderConferencia();renderAtualiz();renderLanc();renderAguardando();renderAdvogado();renderCobrados();renderPagos();
   alert('Conferência registrada!\n'+reg.itens.length+' lançamentos confirmados por '+resp+' em '+fmtDate(data)+'.');
   // Sincroniza Supabase em background
   try{ setSyncStatus('syncing'); await Promise.all(itensConferidos.map(item=>sb.update('lancamentos',item.id,{data_entrada:data,resp_entrada:resp}))); await sb.upsert('atualizacoes',toAtualiz(reg)); setSyncStatus('ok'); }catch(e){ console.warn('Supabase offline:',e.message); setSyncStatus('offline'); } }
-async function excluirConf(id){ if(!confirm('Excluir?'))return; atualizacoes=atualizacoes.filter(x=>x.id!==id);renderAtualiz();try{setSyncStatus('syncing');await sb.delete('atualizacoes',id);setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
+async function excluirConf(id){ if(!confirm('Excluir?'))return; atualizacoes=atualizacoes.filter(x=>x.id!==id);salvarLocal();renderAtualiz();try{setSyncStatus('syncing');await sb.delete('atualizacoes',id);setSyncStatus('ok');}catch(e){console.warn('Supabase offline:',e.message);setSyncStatus('offline');} }
 function verItensConf(id){ const a=atualizacoes.find(x=>x.id===id); if(!a)return; const linhas=a.itens.map(i=>'• '+i.cliente+' — '+i.desc+' — '+fmtDate(i.venc)+' — '+fmt(i.valor)+' ['+i.status+']').join('\n'); alert('Conferência de '+fmtDate(a.data)+' por '+a.resp+'\n\n'+linhas+'\n\nTotal: '+fmt(a.total)); }
 function renderAtualiz(){ const ri=document.getElementById('confResp'); if(ri&&!ri.value)ri.value=currentUser?.label||''; const di=document.getElementById('confData'); if(di&&!di.value)di.value=today(); const ultima=atualizacoes[0]; const cu=document.getElementById('infoUltimaConf'); if(ultima){cu.innerHTML='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><div style="width:38px;height:38px;border-radius:50%;background:#e8f8ee;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">&#10003;</div><div><div style="font-weight:700;font-size:14px;">'+ultima.resp+'</div><div style="font-size:12px;color:#999;">'+fmtDate(ultima.data)+'</div></div></div><div style="font-size:12px;color:#555;background:#f5f5f5;padding:8px 10px;border-radius:6px;"><strong>'+ultima.itens.length+'</strong> lançamentos · <strong>'+fmt(ultima.total)+'</strong>'+(ultima.obs?'<div style="margin-top:4px;color:#888;">📝 '+ultima.obs+'</div>':'')+'</div>';}else{cu.innerHTML='<div style="font-size:13px;color:#bbb;text-align:center;padding:10px;">Nenhuma conferência.</div>';} const tb=document.getElementById('tblHistConf'); document.getElementById('confHistCount').textContent=atualizacoes.length+' conferência(s)'; if(!atualizacoes.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:#bbb;padding:24px;">Nenhuma.</td></tr>';renderConferencia();return;} tb.innerHTML=atualizacoes.map(a=>'<tr><td><strong>'+fmtDate(a.data)+'</strong></td><td>'+a.resp+'</td><td><span class="badge badge-green">'+a.itens.length+' itens</span> <span style="font-size:12px;color:#666;">'+fmt(a.total)+'</span></td><td style="font-size:12px;color:#666;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(a.obs||'—')+'</td><td style="font-size:12px;color:#aaa;">'+a.criadoEm+'</td><td><button class="action-btn" onclick="verItensConf(\''+a.id+'\')">🔍</button><button class="action-btn" onclick="excluirConf(\''+a.id+'\')">🗑️</button></td></tr>').join(''); renderConferencia(); }
 
@@ -1219,13 +1244,12 @@ async function doLogin(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='block';
   err.textContent='';
-  // Carrega SEED imediatamente — tela já fica funcional
-  clientes    = SEED_CLIENTES.map(fromCli);
-  lancamentos = SEED_LANC.map(fromLanc);
-  cobradores  = [];
-  atualizacoes= [];
+  // Carrega localStorage ou SEED como fallback
+  if(!carregarLocal()){
+    clientes    = SEED_CLIENTES.map(fromCli);
+    lancamentos = SEED_LANC.map(fromLanc);
+  }
   renderAll();
-  // Tenta Supabase em background sem bloquear
   setSyncStatus('syncing');
   carregarDoSupabase();
 }
