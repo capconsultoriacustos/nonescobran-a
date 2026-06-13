@@ -901,11 +901,21 @@ async function carregarTudo(){
     console.info('Modo offline: dados carregados do SEED local.');
     return;
   }
+  const _timeout = ms => new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout de conexão')),ms));
   try{
-    clientes     = (await sb.getAll('clientes',   'nome')).map(fromCli);
-    lancamentos  = (await sb.getAll('lancamentos','venc')).map(fromLanc);
-    cobradores   = (await sb.getAll('cobradores', 'nome')).map(fromCob);
-    atualizacoes = (await sb.getAll('atualizacoes','criado_em')).map(fromAtualiz);
+    const [rCli,rLanc,rCob,rAtualiz] = await Promise.race([
+      Promise.all([
+        sb.getAll('clientes',    'nome'),
+        sb.getAll('lancamentos', 'venc'),
+        sb.getAll('cobradores',  'nome'),
+        sb.getAll('atualizacoes','criado_em'),
+      ]),
+      _timeout(12000)
+    ]);
+    clientes     = rCli.map(fromCli);
+    lancamentos  = rLanc.map(fromLanc);
+    cobradores   = rCob.map(fromCob);
+    atualizacoes = rAtualiz.map(fromAtualiz);
     setSyncStatus('ok');
   }catch(e){
     console.warn('Supabase indisponível, usando dados SEED:', e.message);
