@@ -862,19 +862,15 @@ async function doLogin(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='block';
   err.textContent='';
+  // Carrega SEED imediatamente — tela já fica funcional
+  clientes    = SEED_CLIENTES.map(fromCli);
+  lancamentos = SEED_LANC.map(fromLanc);
+  cobradores  = [];
+  atualizacoes= [];
   renderAll();
-  // Conectar Supabase em background
-  showLoading('Conectando ao banco de dados...');
-  try{
-    await seedSeNecessario();
-    await carregarTudo();
-    setSyncStatus('ok');
-    renderAll();
-  }catch(e){
-    console.error(e);
-    setSyncStatus('err');
-  }
-  hideLoading();
+  // Tenta Supabase em background sem bloquear
+  setSyncStatus('syncing');
+  carregarDoSupabase();
 }
 function doLogout(){
   currentUser=null;
@@ -888,20 +884,15 @@ function doLogout(){
 // DATA LOAD
 // ═══════════════════════════════════════════════
 async function carregarTudo(){
-  setSyncStatus('syncing');
-  // Detectar se está rodando via file:// (sem servidor)
-  const isFileProtocol = window.location.protocol === 'file:';
-  if(isFileProtocol){
-    // Modo offline: usar dados SEED diretamente
-    clientes     = SEED_CLIENTES.map(fromCli);
-    lancamentos  = SEED_LANC.map(fromLanc);
-    cobradores   = [];
-    atualizacoes = [];
-    setSyncStatus('ok');
-    console.info('Modo offline: dados carregados do SEED local.');
-    return;
-  }
-  const _timeout = ms => new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout de conexão')),ms));
+  clientes    = SEED_CLIENTES.map(fromCli);
+  lancamentos = SEED_LANC.map(fromLanc);
+  cobradores  = [];
+  atualizacoes= [];
+  carregarDoSupabase();
+}
+async function carregarDoSupabase(){
+  if(window.location.protocol === 'file:'){ setSyncStatus('ok'); return; }
+  const _timeout = ms => new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));
   try{
     const [rCli,rLanc,rCob,rAtualiz] = await Promise.race([
       Promise.all([
@@ -910,19 +901,17 @@ async function carregarTudo(){
         sb.getAll('cobradores',  'nome'),
         sb.getAll('atualizacoes','criado_em'),
       ]),
-      _timeout(12000)
+      _timeout(8000)
     ]);
     clientes     = rCli.map(fromCli);
     lancamentos  = rLanc.map(fromLanc);
     cobradores   = rCob.map(fromCob);
     atualizacoes = rAtualiz.map(fromAtualiz);
     setSyncStatus('ok');
+    renderAll();
+    console.info('Supabase carregado.');
   }catch(e){
-    console.warn('Supabase indisponível, usando dados SEED:', e.message);
-    if(!clientes.length)     clientes     = SEED_CLIENTES.map(fromCli);
-    if(!lancamentos.length)  lancamentos  = SEED_LANC.map(fromLanc);
-    if(!cobradores.length)   cobradores   = [];
-    if(!atualizacoes.length) atualizacoes = [];
+    console.warn('Supabase indisponível:', e.message);
     setSyncStatus('err');
   }
 }
@@ -1213,28 +1202,15 @@ async function doLogin(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='block';
   err.textContent='';
+  // Carrega SEED imediatamente — tela já fica funcional
+  clientes    = SEED_CLIENTES.map(fromCli);
+  lancamentos = SEED_LANC.map(fromLanc);
+  cobradores  = [];
+  atualizacoes= [];
   renderAll();
-  showLoading('Conectando ao banco de dados...');
-  try{
-    await seedSeNecessario();
-    await carregarTudo();
-    setSyncStatus('ok');
-    renderAll();
-  }catch(e){
-    console.error(e); setSyncStatus('err');
-    renderAll();
-  }
-  hideLoading();
-  // Aviso de modo offline
-  if(window.location.protocol === 'file:'){
-    setTimeout(()=>{
-      const b=document.createElement('div');
-      b.style.cssText='position:fixed;bottom:16px;right:16px;background:#f39c12;color:#fff;padding:10px 16px;border-radius:8px;font-size:12px;font-weight:600;z-index:9999;max-width:280px;line-height:1.4;';
-      b.textContent='⚠️ Modo offline (file://): dados do SEED local. Alterações não serão salvas. Para funcionar completo, sirva via servidor HTTP.';
-      document.body.appendChild(b);
-      setTimeout(()=>b.remove(), 8000);
-    }, 500);
-  }
+  // Tenta Supabase em background sem bloquear
+  setSyncStatus('syncing');
+  carregarDoSupabase();
 }
 
 // ═══════════════════════════════════════════════
